@@ -348,6 +348,7 @@ function isFlaggedAddress(a) {
 
 
 const STATUS_OVERRIDES = {
+  // ✅ CONFIRMED via email — address correct, ship as-is
   'mbarge0@gmail.com':           { status: 'confirmed', note: '' },
   'muradaleskerov99@gmail.com':  { status: 'confirmed', note: '' },
   'ycorcos26@gmail.com':         { status: 'confirmed', note: '' },
@@ -382,13 +383,30 @@ const STATUS_OVERRIDES = {
   'nickblaskovich@gmail.com':    { status: 'confirmed', note: '' },
   'ivanovkalin7@gmail.com':      { status: 'confirmed', note: '' },
   'ryan@zernach.com':            { status: 'confirmed', note: '' },
-  'sainatha.yatham@gmail.com':   { status: 'updated',   note: 'New address: 3001 Egan Drive, Pflugerville, TX 78660' },
-  'kashid.k@northeastern.edu':   { status: 'updated',   note: 'Submitted updated address via Google Form' },
-  'andrewsheim@gmail.com':       { status: 'updated',   note: 'New address: 1303 E Cesar Chavez St, Apt E, Austin, TX 78702' },
-  'mike.tikh@gmail.com':         { status: 'flagged',   note: 'Lives 2 blocks from HQ — wants to pick up in person' },
-  'natalyscst@gmail.com':        { status: 'flagged',   note: 'Wants to pick up in person — no mailing address submitted' },
-  'jason.j.jorgenson@gmail.com': { status: 'flagged',   note: 'Address correct but in office — offered to pick up at HQ' },
-  'reena.pjfx@gmail.com':        { status: 'flagged',   note: 'Via Slack — picking up jacket in person tomorrow' },
+
+  // 📝 UPDATED via email reply
+  'sainatha.yatham@gmail.com':   { status: 'updated', note: 'New: 3001 Egan Drive, Pflugerville, TX 78660' },
+  'andrewsheim@gmail.com':       { status: 'updated', note: 'New: 1303 E Cesar Chavez St, Apt E, Austin, TX 78702' },
+
+  // 📝 UPDATED via Google Form
+  'loganmay168@gmail.com':       { status: 'updated', note: 'New: 5213 Westheimer Rd, Keller, TX 76244' },
+  'matt.h.programmer@gmail.com': { status: 'updated', note: 'New: 2001 S Mopac Expy, #2034, Austin, TX 78746' },
+  'zr.davaa@gmail.com':          { status: 'updated', note: 'New: 8421-1418 Broad St, Unit 1418, McLean, VA 22102' },
+  'kashid.k@northeastern.edu':   { status: 'updated', note: 'New: 75 W 18th St, Apt 351, Indianapolis, IN 46202' },
+  'frankyan@usc.edu':            { status: 'updated', note: 'New: 1108 Nueces St, #305, Austin, TX 78701' },
+  's94.david@gmail.com':         { status: 'updated', note: 'New: 168 Belterra Village Way, #14007, Austin, TX 78737' },
+  'me@amaan.com':                { status: 'updated', note: 'New: 700 River St, Apt #3503, Austin, TX 78701' },
+  'tgrahammor@gmail.com':        { status: 'updated', note: 'New: 168 Belterra Village Way, Apt 14007, Austin, TX 78737' },
+  'justicepwhite@gmail.com':     { status: 'updated', note: 'New: 4204 Aldama Dr, Austin, TX 78739' },
+  'nickkenkel@gmail.com':        { status: 'updated', note: 'New: 2410 Bryan St, Austin, TX 78702' },
+  'adamisom@hey.com':            { status: 'updated', note: 'New: 1303 E Cesar Chavez St, Apt E, Austin, TX 78702' },
+  'do.infinitely@gmail.com':     { status: 'updated', note: 'New: 2025 E 7th St, Apt 244, Austin, TX 78702 (was San Francisco — fixed)' },
+
+  // 🏢 PICKUP IN PERSON
+  'mike.tikh@gmail.com':         { status: 'flagged', note: 'Pickup in person — new address also on file: 321 W 6th St, #3101, Austin, TX 78701' },
+  'natalyscst@gmail.com':        { status: 'flagged', note: 'Wants to pick up in person — no mailing address submitted' },
+  'jason.j.jorgenson@gmail.com': { status: 'flagged', note: 'Address correct — offered to pick up at HQ' },
+  'reena.pjfx@gmail.com':        { status: 'updated', note: 'Via Slack — picking up jacket in person tomorrow' },
 };
 
 function initAlumni() {
