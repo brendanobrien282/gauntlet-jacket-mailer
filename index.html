@@ -346,8 +346,56 @@ function isFlaggedAddress(a) {
   return s.toLowerCase().includes('will send') || s.toLowerCase().includes('later') || s === '' || a['City'].toLowerCase().includes('will send');
 }
 
+
+const STATUS_OVERRIDES = {
+  'mbarge0@gmail.com':           { status: 'confirmed', note: '' },
+  'muradaleskerov99@gmail.com':  { status: 'confirmed', note: '' },
+  'ycorcos26@gmail.com':         { status: 'confirmed', note: '' },
+  'greatthenate9@gmail.com':     { status: 'confirmed', note: '' },
+  'marcusday3586@gmail.com':     { status: 'confirmed', note: '' },
+  'tahmeed.rahim@gmail.com':     { status: 'confirmed', note: '' },
+  'yibinlong@outlook.com':       { status: 'confirmed', note: '' },
+  'fuechec.mark@gmail.com':      { status: 'confirmed', note: '' },
+  'samimheard@gmail.com':        { status: 'confirmed', note: '' },
+  'jaram.isaac@gmail.com':       { status: 'confirmed', note: '' },
+  'kornacle@gmail.com':          { status: 'confirmed', note: '' },
+  'gratefulgabe5000@gmail.com':  { status: 'confirmed', note: '' },
+  'maxliss19@gmail.com':         { status: 'confirmed', note: '' },
+  'lousydropout@gmail.com':      { status: 'confirmed', note: '' },
+  'mtornar@gmail.com':           { status: 'confirmed', note: '' },
+  'eric@fullstackeric.com':      { status: 'confirmed', note: '' },
+  'etweinhaus@gmail.com':        { status: 'confirmed', note: '' },
+  'atharva.sardar02@gmail.com':  { status: 'confirmed', note: '' },
+  'ciscodg@gmail.com':           { status: 'confirmed', note: '' },
+  'ankitrijal2054@gmail.com':    { status: 'confirmed', note: '' },
+  'ramishsaqib@yahoo.com':       { status: 'confirmed', note: '' },
+  'hello@adamwhite.work':        { status: 'confirmed', note: '' },
+  'tylerpohn@gmail.com':         { status: 'confirmed', note: '' },
+  'mylesethan93@gmail.com':      { status: 'confirmed', note: '' },
+  'kyuxan@gmail.com':            { status: 'confirmed', note: '' },
+  'maxim.efremov@gmail.com':     { status: 'confirmed', note: '' },
+  'robglnn@gmail.com':           { status: 'confirmed', note: '' },
+  'jskeete@gmail.com':           { status: 'confirmed', note: '' },
+  'john.crimmins@live.com':      { status: 'confirmed', note: '' },
+  'aydinsorensen@gmail.com':     { status: 'confirmed', note: '' },
+  'nrosenfi@gmail.com':          { status: 'confirmed', note: '' },
+  'nickblaskovich@gmail.com':    { status: 'confirmed', note: '' },
+  'ivanovkalin7@gmail.com':      { status: 'confirmed', note: '' },
+  'ryan@zernach.com':            { status: 'confirmed', note: '' },
+  'sainatha.yatham@gmail.com':   { status: 'updated',   note: 'New address: 3001 Egan Drive, Pflugerville, TX 78660' },
+  'kashid.k@northeastern.edu':   { status: 'updated',   note: 'Submitted updated address via Google Form' },
+  'andrewsheim@gmail.com':       { status: 'updated',   note: 'New address: 1303 E Cesar Chavez St, Apt E, Austin, TX 78702' },
+  'mike.tikh@gmail.com':         { status: 'flagged',   note: 'Lives 2 blocks from HQ — wants to pick up in person' },
+  'natalyscst@gmail.com':        { status: 'flagged',   note: 'Wants to pick up in person — no mailing address submitted' },
+  'jason.j.jorgenson@gmail.com': { status: 'flagged',   note: 'Address correct but in office — offered to pick up at HQ' },
+  'reena.pjfx@gmail.com':        { status: 'flagged',   note: 'Via Slack — picking up jacket in person tomorrow' },
+};
+
 function initAlumni() {
-  alumni = ALUMNI_BASE.map((a, i) => ({
+  alumni = ALUMNI_BASE.map((a, i) => {
+    const emailKey = a['Email Address'].toLowerCase();
+    const override = STATUS_OVERRIDES[emailKey] || STATUS_OVERRIDES[a['Email Address']] || null;
+    return {
       id: i,
       firstName: (a['First Name'] || '').trim(),
       lastName: (a['Last Name'] || '').trim(),
@@ -358,10 +406,11 @@ function initAlumni() {
       state: (a['State/Province/Region'] || '').trim(),
       zip: String(a['Zip/Postal Code'] || '').trim(),
       country: (a['Country'] || '').trim(),
-      status: isFlaggedAddress(a) ? 'flagged' : 'pending',
-      sentAt: null,
-      note: ''
-    }));
+      status: override ? override.status : (isFlaggedAddress(a) ? 'flagged' : 'pending'),
+      sentAt: override ? Date.now() : null,
+      note: override ? override.note : ''
+    };
+  });
 }
 // settings loaded from defaults above
 
