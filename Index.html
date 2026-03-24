@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gauntlet AI — Jacket Mailer</title>
+
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141417;
+    --surface2: #1c1c21;
+    --border: #2a2a32;
+    --accent: #ffffff;
+    --accent2: #a0b4ff;
+    --danger: #ff5c5c;
+    --success: #4dffa0;
+    --text: #f0f0f0;
+    --muted: #666680;
+    --font-head: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-mono); min-height: 100vh; }
+
+  /* LAYOUT */
+  .app { display: grid; grid-template-columns: 260px 1fr; grid-template-rows: 60px 1fr; height: 100vh; overflow: hidden; }
+  .topbar { grid-column: 1 / -1; display: flex; align-items: center; padding: 0 24px; border-bottom: 1px solid var(--border); gap: 16px; background: var(--surface); }
+  .logo { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-weight: 700; font-size: 18px; color: #ffffff; letter-spacing: -0.3px; display: flex; align-items: center; gap: 10px; }
+  .logo svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .logo-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  .logo-sub { color: var(--muted); font-weight: 400; font-size: 14px; font-family: var(--font-mono); }
+  .topbar-stats { display: flex; gap: 24px; margin-left: auto; }
+  .stat { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .stat b { color: var(--text); font-size: 14px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-pending { background: var(--muted); }
+  .dot-sent { background: var(--accent2); }
+  .dot-confirmed { background: var(--success); }
+  .dot-updated { background: #a0b4ff; }
+
+  /* SIDEBAR */
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; padding: 12px 0; }
+  .sidebar-section { padding: 8px 16px 4px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+  .alumni-item { padding: 10px 16px; cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s; display: flex; align-items: center; gap: 10px; }
+  .alumni-item:hover { background: var(--surface2); }
+  .alumni-item.active { background: var(--surface2); border-left-color: #ffffff; }
+  .alumni-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .alumni-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-pending { background: var(--muted); }
+  .status-sent { background: var(--accent2); }
+  .status-confirmed { background: var(--success); }
+  .status-updated { background: #a0b4ff; }
+  .status-flagged { background: var(--danger); }
+
+  /* MAIN PANEL */
+  .main { overflow-y: auto; background: var(--bg); }
+  .panel { padding: 32px; max-width: 860px; }
+  h1 { font-family: var(--font-head); font-weight: 800; font-size: 28px; color: var(--text); margin-bottom: 4px; }
+  h2 { font-family: var(--font-head); font-weight: 700; font-size: 18px; color: var(--text); margin-bottom: 12px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 10px 20px; font-family: var(--font-mono); font-size: 13px; cursor: pointer; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: #ffffff; border-bottom-color: #ffffff; }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+  .card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 8px; }
+  .address-block { font-size: 14px; line-height: 1.8; color: var(--text); }
+  .flagged-notice { background: rgba(255,92,92,0.1); border: 1px solid var(--danger); border-radius: 6px; padding: 10px 14px; font-size: 12px; color: var(--danger); margin-bottom: 16px; }
+
+  /* EMAIL PREVIEW */
+  .email-preview { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+  .email-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 60px 1fr; gap: 4px 12px; }
+  .email-field-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; padding-top: 2px; }
+  .email-field-val { font-size: 13px; color: var(--text); }
+  .email-body { padding: 20px 18px; font-size: 13px; line-height: 1.9; color: #ccc; white-space: pre-wrap; }
+  .email-body .highlight { color: var(--accent); font-weight: 500; }
+  .email-body a { color: var(--accent2); text-decoration: underline; }
+
+  /* BUTTONS */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 6px; font-family: var(--font-mono); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: #ffffff; color: #0d0d0f; }
+  .btn-primary:hover { background: #e0e0e0; }
+  .btn-primary:disabled { background: #444; color: #888; cursor: not-allowed; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-danger:hover { background: rgba(255,92,92,0.1); }
+  .btn-success { background: var(--success); color: #0d0d0f; }
+
+  /* MANUAL STATUS */
+  .status-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .status-btn { padding: 6px 14px; border-radius: 20px; font-size: 11px; font-family: var(--font-mono); cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.15s; }
+  .status-btn:hover { color: var(--text); border-color: var(--text); }
+  .status-btn.active-confirmed { background: rgba(77,255,160,0.15); border-color: var(--success); color: var(--success); }
+  .status-btn.active-updated { background: rgba(160,180,255,0.15); border-color: #a0b4ff; color: #a0b4ff; }
+  .status-btn.active-flagged { background: rgba(255,92,92,0.15); border-color: var(--danger); color: var(--danger); }
+
+  /* DASHBOARD */
+  .dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  .dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; }
+  .dash-num { font-family: var(--font-head); font-size: 36px; font-weight: 800; }
+  .dash-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+  .num-pending { color: var(--muted); }
+  .num-sent { color: var(--accent2); }
+  .num-confirmed { color: var(--success); }
+  .num-updated { color: #a0b4ff; }
+
+  .tracker-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tracker-table th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+  .tracker-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,42,50,0.5); vertical-align: middle; }
+  .tracker-table tr:hover td { background: var(--surface); }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 12px; font-size: 11px; }
+  .badge-pending { background: rgba(102,102,128,0.2); color: var(--muted); }
+  .badge-sent { background: rgba(71,214,255,0.15); color: var(--accent2); }
+  .badge-confirmed { background: rgba(77,255,160,0.15); color: var(--success); }
+  .badge-updated { background: rgba(160,180,255,0.15); color: #a0b4ff; }
+  .badge-flagged { background: rgba(255,92,92,0.15); color: var(--danger); }
+
+  /* CAMPAIGN VIEW */
+  .campaign-bar { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px; }
+  .progress-wrap { flex: 1; background: var(--bg); border-radius: 4px; height: 6px; overflow: hidden; }
+  .progress-fill { height: 100%; background: #ffffff; border-radius: 4px; transition: width 0.4s ease; }
+  .progress-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* SEND ALL */
+  .send-all-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 20px; }
+  .send-all-panel p { font-size: 13px; color: var(--muted); line-height: 1.7; margin-bottom: 16px; }
+
+  /* SETTINGS */
+  .input-group { margin-bottom: 16px; }
+  .input-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; }
+  .input-field { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--text); font-family: var(--font-mono); font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .input-field:focus { border-color: var(--accent); }
+  textarea.input-field { min-height: 120px; resize: vertical; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; font-size: 13px; display: flex; align-items: center; gap: 10px; z-index: 1000; transform: translateY(80px); opacity: 0; transition: all 0.3s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-success { border-color: var(--success); }
+  .toast-error { border-color: var(--danger); }
+
+  /* SENDING OVERLAY */
+  .sending-overlay { display: none; position: fixed; inset: 0; background: rgba(13,13,15,0.85); z-index: 500; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+  .sending-overlay.active { display: flex; }
+  .sending-spinner { width: 48px; height: 48px; border: 3px solid var(--border); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sending-msg { font-family: var(--font-head); font-size: 18px; }
+  .sending-sub { font-size: 12px; color: var(--muted); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* UTILS */
+  .hidden { display: none !important; }
+  .mt-8 { margin-top: 8px; }
+  .mt-16 { margin-top: 16px; }
+  .text-muted { color: var(--muted); font-size: 12px; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+  .filter-btn { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-family: var(--font-mono); cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--muted); transition: all 0.15s; }
+  .filter-btn:hover, .filter-btn.active { color: var(--text); border-color: var(--text); }
+  .filter-input { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; color: var(--text); font-family: var(--font-mono); font-size: 12px; outline: none; flex: 1; max-width: 200px; }
+  .filter-input:focus { border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo">
+      Gauntlet
+      <div class="logo-divider"></div>
+      <span class="logo-sub">Jacket Mailer</span>
+    </div>
+    <div class="topbar-stats">
+      <div class="stat"><div class="dot dot-pending"></div> <span>Pending: <b id="count-pending">0</b></span></div>
+      <div class="stat"><div class="dot dot-sent"></div> <span>Sent: <b id="count-sent">0</b></span></div>
+      <div class="stat"><div class="dot dot-confirmed"></div> <span>Confirmed: <b id="count-confirmed">0</b></span></div>
+      <div class="stat"><div class="dot dot-updated"></div> <span>Updated: <b id="count-updated">0</b></span></div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">Alumni (73)</div>
+    <div id="alumni-list"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- INDIVIDUAL VIEW -->
+    <div id="view-individual" class="panel hidden">
+      <div id="individual-content"></div>
+    </div>
+
+    <!-- CAMPAIGN VIEW -->
+    <div id="view-campaign" class="panel">
+      <h1>Jacket Address Campaign</h1>
+      <div class="subtitle">Confirm mailing addresses for 73 Gauntlet AI alumni before shipping jackets.</div>
+
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('overview')">Overview</button>
+        <button class="tab" onclick="switchTab('send-all')">Send Emails</button>
+        <button class="tab" onclick="switchTab('tracker')">Tracker</button>
+        <button class="tab" onclick="switchTab('settings')">Settings</button>
+      </div>
+
+      <!-- OVERVIEW TAB -->
+      <div id="tab-overview">
+        <div class="dash-grid">
+          <div class="dash-card"><div class="dash-num num-pending" id="d-pending">0</div><div class="dash-label">Pending</div></div>
+          <div class="dash-card"><div class="dash-num num-sent" id="d-sent">0</div><div class="dash-label">Sent</div></div>
+          <div class="dash-card"><div class="dash-num num-confirmed" id="d-confirmed">0</div><div class="dash-label">Confirmed</div></div>
+          <div class="dash-card"><div class="dash-num num-updated" id="d-updated">0</div><div class="dash-label">Address Updated</div></div>
+        </div>
+
+        <div class="campaign-bar">
+          <div class="progress-wrap"><div class="progress-fill" id="progress-bar" style="width:0%"></div></div>
+          <div class="progress-label" id="progress-label">0 / 73 actioned</div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Quick Actions</div>
+          <div class="btn-row mt-8">
+            <button class="btn btn-outline" onclick="switchTab('send-all'); document.querySelector('.tab:nth-child(2)').click()">📧 Send All Unsent Emails</button>
+            <button class="btn btn-outline" onclick="switchTab('tracker'); document.querySelector('.tab:nth-child(3)').click()">📋 View Full Tracker</button>
+            <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">⚠ Flagged Addresses (Need Attention)</div>
+          <div id="flagged-list" class="mt-8"></div>
+        </div>
+      </div>
+
+      <!-- SEND ALL TAB -->
+      <div id="tab-send-all" class="hidden">
+        <div class="send-all-panel">
+          <h2>Send Confirmation Emails</h2>
+          <p>Each alumni will receive a personalized email showing their address on file. They'll confirm it's correct or click a link to submit an updated address via Google Form.<br><br>
+          Emails are sent <b style="color:var(--text)">individually</b> — no reply-all risk. Your Gmail account <b style="color:var(--accent)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="1b79697e757f7a755b7c7a6e756f777e6f736a35787476">[email&#160;protected]</a></b> will be used.</p>
+          <div id="form-link-warning" class="flagged-notice">⚠ You haven't set a Google Form link yet. Go to Settings → add your form URL before sending.</div>
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="sendAllEmails()" id="btn-send-all">Send to All Pending (–)</button>
+            <button class="btn btn-outline" onclick="previewFirst()">Preview First Email</button>
+          </div>
+        </div>
+
+        <div id="send-log" class="card hidden">
+          <div class="card-label">Send Log</div>
+          <div id="send-log-entries" class="mt-8"></div>
+        </div>
+      </div>
+
+      <!-- TRACKER TAB -->
+      <div id="tab-tracker" class="hidden">
+        <div class="filter-row">
+          <input class="filter-input" id="search-input" placeholder="Search name or email…" oninput="renderTracker()">
+          <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">All</button>
+          <button class="filter-btn" data-filter="pending" onclick="setFilter('pending', this)">Pending</button>
+          <button class="filter-btn" data-filter="sent" onclick="setFilter('sent', this)">Sent</button>
+          <button class="filter-btn" data-filter="confirmed" onclick="setFilter('confirmed', this)">Confirmed</button>
+          <button class="filter-btn" data-filter="updated" onclick="setFilter('updated', this)">Updated</button>
+          <button class="filter-btn" data-filter="flagged" onclick="setFilter('flagged', this)">Flagged</button>
+          <button class="btn btn-outline" style="margin-left:auto;padding:5px 14px;font-size:12px" onclick="exportCSV()">⬇ Export</button>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="tracker-table">
+            <thead><tr>
+              <th>Name</th><th>Email</th><th>Address on File</th><th>Status</th><th>Action</th>
+            </tr></thead>
+            <tbody id="tracker-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div id="tab-settings" class="hidden">
+        <div class="card">
+          <h2>Campaign Settings</h2>
+          <div class="input-group">
+            <div class="input-label">Your Google Form URL (for address updates)</div>
+            <input class="input-field" id="setting-form-url" placeholder="https://forms.gle/…" oninput="saveSettings()">
+            <div class="text-muted mt-8">Alumni who need to update their address will receive this link.</div>
+          </div>
+          <div class="input-group">
+            <div class="input-label">Sender Name</div>
+            <input class="input-field" id="setting-sender-name" value="Brendan @ Gauntlet AI" oninput="saveSettings()">
+          </div>
+          <div class="input-group">
+            <div class="input-label">Reply-To Email</div>
+            <input class="input-field" id="setting-reply-to" value="brendan@gauntlethq.com" oninput="saveSettings()">
+          </div>
+        </div>
+        <div class="card">
+          <h2>Email Template Preview</h2>
+          <div class="email-preview">
+            <div class="email-header">
+              <span class="email-field-label">Subject</span><span class="email-field-val" id="tmpl-subject-preview"></span>
+              <span class="email-field-label">From</span><span class="email-field-val" id="tmpl-from-preview"></span>
+            </div>
+            <div class="email-body" id="tmpl-body-preview"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SENDING OVERLAY -->
+<div class="sending-overlay" id="sending-overlay">
+  <div class="sending-spinner"></div>
+  <div class="sending-msg" id="sending-msg">Sending emails…</div>
+  <div class="sending-sub" id="sending-sub">Please wait</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const RAW_ALUMNI = [{"First Name":"Matt","Last Name":"Barge","Email Address":"mbarge0@gmail.com","Street Address Line 1":"1330 Shore District Dr #2419","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Austin","State/Province/Region":"TX","Zip/Postal Code":78741,"Country":"United States"},{"First Name":"Andy","Last Name":"Chuong","Email Address":"achuongdev@gmail.com","Street Address Line 1":"13 S Gray St","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Lakewood","State/Province/Region":"CO","Zip/Postal Code":80226,"Country":"United States"},{"First Name":"Sainatha Reddy","Last Name":"Yatham","Email Address":"sainatha.yatham@gmail.com","Street Address Line 1":"16215 Stoney Elms Court","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Houston","State/Province/Region":"Texas","Zip/Postal Code":77084,"Country":"United States"},{"First Name":"Noah","Last Name":"Rosenfield","Email Address":"nrosenfi@gmail.com","Street Address Line 1":"214 W Chestnut","Street Address Line 2 (Apartment, Suite, etc.)":"Unit 203","City":"Kingston","State/Province/Region":"NY","Zip/Postal Code":12401,"Country":"United States"},{"First Name":"Yahav","Last Name":"Corcos","Email Address":"ycorcos26@gmail.com","Street Address Line 1":"105-05 69th Avenue","Street Address Line 2 (Apartment, Suite, etc.)":506,"City":"Forest Hills ","State/Province/Region":"NY","Zip/Postal Code":11375,"Country":"United States"},{"First Name":"Nicholas","Last Name":"Blaskovich","Email Address":"nickblaskovich@gmail.com","Street Address Line 1":"6741 S Franklin St","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Centennial","State/Province/Region":"CO","Zip/Postal Code":80122,"Country":"United States"},{"First Name":"Andrew","Last Name":"Heim","Email Address":"andrewsheim@gmail.com","Street Address Line 1":"215 Harness Ct","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Templeton","State/Province/Region":"CA","Zip/Postal Code":93465,"Country":"United States"},{"First Name":"Sanjay","Last Name":"Karinje","Email Address":"sanjay.karinje.8@gmail.com","Street Address Line 1":"425 1st Street","Street Address Line 2 (Apartment, Suite, etc.)":807,"City":"San Francisco","State/Province/Region":"CA","Zip/Postal Code":94105,"Country":"United States"},{"First Name":"Adam","Last Name":"White","Email Address":"hello@adamwhite.work","Street Address Line 1":"12207 Dunbeg Ln ","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Richmond","State/Province/Region":"Texas","Zip/Postal Code":77407,"Country":"United States"},{"First Name":"Myles","Last Name":"Lewis","Email Address":"mylesethan93@gmail.com","Street Address Line 1":"3779 Bellaire Blvd","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Houston","State/Province/Region":"Texas","Zip/Postal Code":77025,"Country":"United States"},{"First Name":"David","Last Name":"Spearman","Email Address":"s94.david@gmail.com","Street Address Line 1":"232 Riggs Dr. ","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Clemson","State/Province/Region":"South Carolina","Zip/Postal Code":29631,"Country":"United States"},{"First Name":"Davaakhatan","Last Name":"Zorigtbaatar","Email Address":"zr.davaa@gmail.com","Street Address Line 1":"8421 broad street, McLean, Virginia-22102","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"McLean","State/Province/Region":"VA","Zip/Postal Code":22102,"Country":"United States"},{"First Name":"Atharva","Last Name":"Sardar","Email Address":"atharva.sardar02@gmail.com","Street Address Line 1":"2251 Pimmit Dr Apt 1117","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Falls Church","State/Province/Region":"Virginia","Zip/Postal Code":22043,"Country":"United States"},{"First Name":"Nate","Last Name":"Shumway","Email Address":"greatthenate9@gmail.com","Street Address Line 1":"1973 Mill Corner Cir","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Salt Lake City","State/Province/Region":"Ut","Zip/Postal Code":84106,"Country":"United States"},{"First Name":"Ankit","Last Name":"Rijal","Email Address":"ankitrijal2054@gmail.com","Street Address Line 1":"8175 Atlas Pear Drive","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 6307","City":"College Station","State/Province/Region":"TX","Zip/Postal Code":77845,"Country":"United States"},{"First Name":"Elvis","Last Name":"Ibarra","Email Address":"ielvisd@gmail.com","Street Address Line 1":"2940 Elm street","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Los Angeles","State/Province/Region":"CA","Zip/Postal Code":90065,"Country":"United States"},{"First Name":"Vincent","Last Name":"Chan","Email Address":"lousydropout@gmail.com","Street Address Line 1":"7058 Fort Union Ct","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Las Vegas","State/Province/Region":"NV","Zip/Postal Code":89179,"Country":"United States"},{"First Name":"Marcus ","Last Name":"Day","Email Address":"marcusday3586@gmail.com","Street Address Line 1":"7227 Stonebrook Dr","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Fort Smith ","State/Province/Region":"AR","Zip/Postal Code":72916,"Country":"United States"},{"First Name":"Adam","Last Name":"Isom","Email Address":"adamisom@hey.com","Street Address Line 1":"1324 E 100 S","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Salt Lake City","State/Province/Region":"UT","Zip/Postal Code":84102,"Country":"United States"},{"First Name":"Kishor ","Last Name":"Kashid","Email Address":"kashid.k@northeastern.edu","Street Address Line 1":"610 Wood St ","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 427","City":"Athens ","State/Province/Region":"Texas ","Zip/Postal Code":75751,"Country":"United States"},{"First Name":"Harrison","Last Name":"Glenn","Email Address":"robglnn@gmail.com","Street Address Line 1":"4519 James Drive","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Midland","State/Province/Region":"MI","Zip/Postal Code":48642,"Country":"United States"},{"First Name":"Tyler","Last Name":"Pohn","Email Address":"tylerpohn@gmail.com","Street Address Line 1":"818 E Old Willow Rd","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 205","City":"Prospect Heights","State/Province/Region":"IL","Zip/Postal Code":60070,"Country":"United States"},{"First Name":"Eric","Last Name":"Roupe","Email Address":"eric@fullstackeric.com","Street Address Line 1":"99 E Bay Rd","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Osterville","State/Province/Region":"MA","Zip/Postal Code":"02655","Country":"United States"},{"First Name":"Ethan","Last Name":"Weinhaus","Email Address":"etweinhaus@gmail.com","Street Address Line 1":"480 W Broadway ","Street Address Line 2 (Apartment, Suite, etc.)":"Apartment 308","City":"Boston","State/Province/Region":"MA","Zip/Postal Code":"02127","Country":"United States"},{"First Name":"Nataly","Last Name":"Costa","Email Address":"natalyscst@gmail.com","Street Address Line 1":"(Will send later when I have an American address)","Street Address Line 2 (Apartment, Suite, etc.)":301,"City":"(Will send later)","State/Province/Region":"(Will send later)","Zip/Postal Code":"00000","Country":"United States"},{"First Name":"Johnathan","Last Name":"Skeete","Email Address":"JSkeete@gmail.com","Street Address Line 1":"1855 Diamond St","Street Address Line 2 (Apartment, Suite, etc.)":"5-327","City":"San Diego","State/Province/Region":"CA","Zip/Postal Code":92109,"Country":"United States"},{"First Name":"Gray","Last Name":"Morrow","Email Address":"tgrahammor@gmail.com","Street Address Line 1":"102 Mount Vernon Ave","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Alexandria","State/Province/Region":"VA","Zip/Postal Code":22301,"Country":"United States"},{"First Name":"Tahmeed","Last Name":"Rahim","Email Address":"tahmeed.rahim@gmail.com","Street Address Line 1":"6860 Glen Erin Drive","Street Address Line 2 (Apartment, Suite, etc.)":"Unit 6","City":"Toronto","State/Province/Region":"Ontario","Zip/Postal Code":"L5N 2E1","Country":"Canada"},{"First Name":"Murad","Last Name":"Aleskerov","Email Address":"muradaleskerov99@gmail.com","Street Address Line 1":"135 Orchid Court","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Toms River","State/Province/Region":"NJ","Zip/Postal Code":"08753","Country":"United States"},{"First Name":"Tony","Last Name":"Kim","Email Address":"tonykim.tech@gmail.com","Street Address Line 1":"8818 48th Pl W","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Mukilteo","State/Province/Region":"WA","Zip/Postal Code":98275,"Country":"United States"},{"First Name":"Ramish","Last Name":"Saqib","Email Address":"ramishsaqib@yahoo.com","Street Address Line 1":"2709 Pearsall Ave","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Bronx","State/Province/Region":"NY","Zip/Postal Code":10469,"Country":"United States"},{"First Name":"Alexander","Last Name":"Ho","Email Address":"alexho27x@gmail.com","Street Address Line 1":"5778 S Depew Cir","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Littleton","State/Province/Region":"CO","Zip/Postal Code":80123,"Country":"United States"},{"First Name":"Kalin","Last Name":"Ivanov","Email Address":"ivanovkalin7@gmail.com","Street Address Line 1":"8424 Eagle View Dr","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Durham","State/Province/Region":"North Carolina","Zip/Postal Code":27713,"Country":"United States"},{"First Name":"Yi Bin","Last Name":"Long","Email Address":"yibinlong@outlook.com","Street Address Line 1":"2291 Stone Glen Crescent","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Oakville","State/Province/Region":"ON","Zip/Postal Code":"L6M 0C8","Country":"Canada"},{"First Name":"Matt","Last Name":"Hulme","Email Address":"matt.h.programmer@gmail.com","Street Address Line 1":"13129 S Tower Ridge Drive","Street Address Line 2 (Apartment, Suite, etc.)":"Apartment E305","City":"Riverton ","State/Province/Region":"Utah","Zip/Postal Code":84096,"Country":"United States"},{"First Name":"Reuben","Last Name":"Brooks","Email Address":"reub.brooks@gmail.com","Street Address Line 1":"6260 Magnolia Ln N","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Maple Grove","State/Province/Region":"MN","Zip/Postal Code":55369,"Country":"United States"},{"First Name":"Kiran","Last Name":"Rushton","Email Address":"krushton218@gmail.com","Street Address Line 1":"24277 Saybrook Court","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Novi","State/Province/Region":"MI","Zip/Postal Code":48374,"Country":"United States"},{"First Name":"John","Last Name":"Crimmins","Email Address":"john.crimmins@live.com","Street Address Line 1":"4301 dominion forest circle","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 1331","City":"Glen allen","State/Province/Region":"Va","Zip/Postal Code":23060,"Country":"United States"},{"First Name":"Noah","Last Name":"St. Juliana","Email Address":"nstjuliana@gmail.com","Street Address Line 1":"51964 Fir Road","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Granger","State/Province/Region":"INDIANA","Zip/Postal Code":46530,"Country":"United States"},{"First Name":"Frank","Last Name":"Yang","Email Address":"frankyan@usc.edu","Street Address Line 1":"227-20 64th Ave","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Bayside","State/Province/Region":"NY","Zip/Postal Code":11364,"Country":"United States"},{"First Name":"Bruce","Last Name":"Robinson","Email Address":"brucedeanrobinson@gmail.com","Street Address Line 1":"916 Banklick St","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Covington","State/Province/Region":"KY","Zip/Postal Code":41011,"Country":"United States"},{"First Name":"Amaan","Last Name":"Sayed","Email Address":"me@amaan.com","Street Address Line 1":"250 W Queen Creek Rd","Street Address Line 2 (Apartment, Suite, etc.)":"Unit 219","City":"Chandler","State/Province/Region":"Arizona","Zip/Postal Code":85248,"Country":"United States"},{"First Name":"Ryan","Last Name":"Zernach","Email Address":"ryan@zernach.com","Street Address Line 1":"13 Westview Drive","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Jasper","State/Province/Region":"Georgia","Zip/Postal Code":30143,"Country":"United States"},{"First Name":"Miriam","Last Name":"Simone","Email Address":"miriam.rose.simone@gmail.com","Street Address Line 1":"412 SW 5th St","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 201","City":"Corvallis","State/Province/Region":"OR","Zip/Postal Code":97333,"Country":"United States"},{"First Name":"Casey","Last Name":"Manos","Email Address":"manoscasey@gmail.com","Street Address Line 1":"1211 Chambers Rd","Street Address Line 2 (Apartment, Suite, etc.)":129,"City":"Columbus","State/Province/Region":"OH","Zip/Postal Code":43212,"Country":"United States"},{"First Name":"Remy","Last Name":"Ochei","Email Address":"do.infinitely@gmail.com","Street Address Line 1":"1219 Bethel School Court","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Coppell","State/Province/Region":"Texas","Zip/Postal Code":75019,"Country":"United States"},{"First Name":"Justice","Last Name":"Perez White","Email Address":"justicepwhite@gmail.com","Street Address Line 1":"2515 Elmont Dr","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 129","City":"Austin","State/Province/Region":"TX","Zip/Postal Code":78741,"Country":"United States"},{"First Name":"Claudia","Last Name":"Alban","Email Address":"claudia.alban24@gmail.com","Street Address Line 1":"8870 s myrtle ave ","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"tempe","State/Province/Region":"arizona","Zip/Postal Code":85824,"Country":"United States"},{"First Name":"Francisco","Last Name":"de Guzman","Email Address":"ciscodg@gmail.com","Street Address Line 1":"23801 palmek circle","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Lake forest","State/Province/Region":"California ","Zip/Postal Code":92630,"Country":"United States"},{"First Name":"Tom","Last Name":"Bauer","Email Address":"tom.a.bauer@protonmail.com","Street Address Line 1":"530 W Surf St","Street Address Line 2 (Apartment, Suite, etc.)":"Unit 403","City":"Chicago","State/Province/Region":"IL","Zip/Postal Code":60657,"Country":"United States"},{"First Name":"Mark","Last Name":"Fuechec","Email Address":"fuechec.mark@gmail.com","Street Address Line 1":"1309 Edgebrook Dri","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"El Campo","State/Province/Region":"Texas","Zip/Postal Code":77437,"Country":"United States"},{"First Name":"Gabe","Last Name":"Sizemore","Email Address":"gratefulgabe5000@gmail.com","Street Address Line 1":"122 Kevin Dr","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Kathleen ","State/Province/Region":"GA","Zip/Postal Code":31047,"Country":"United States"},{"First Name":"Isaac","Last Name":"Jaramillo","Email Address":"jaram.isaac@gmail.com","Street Address Line 1":"12605 Orchard Grove Ln","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Manor","State/Province/Region":"TX","Zip/Postal Code":78653,"Country":"United States"},{"First Name":"Arial","Last Name":"Gardner","Email Address":"arialgardner@gmail.com","Street Address Line 1":"50 Carmine St","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 4","City":"New York","State/Province/Region":"NY","Zip/Postal Code":10014,"Country":"United States"},{"First Name":"Nick","Last Name":"Kenkel","Email Address":"nickkenkel@gmail.com","Street Address Line 1":"5121 Peaceful Pond Ave","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Las Vegas","State/Province/Region":"NV","Zip/Postal Code":89131,"Country":"United States"},{"First Name":"Max","Last Name":"Liss","Email Address":"maxliss19@gmail.com","Street Address Line 1":"615 Parcher St","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Wausau","State/Province/Region":"WI","Zip/Postal Code":54403,"Country":"United States"},{"First Name":"Kenneth","Last Name":"Yu","Email Address":"kyuxan@gmail.com","Street Address Line 1":"65 Rivington St Apt 2","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"New York","State/Province/Region":"NY ","Zip/Postal Code":10002,"Country":"United States"},{"First Name":"Michael","Last Name":"Tornaritis","Email Address":"mtornar@gmail.com","Street Address Line 1":"1800 North Milwaukee Avenue","Street Address Line 2 (Apartment, Suite, etc.)":"Unit 2S","City":"Chicago","State/Province/Region":"Illinois","Zip/Postal Code":60647,"Country":"United States"},{"First Name":"Rasheed","Last Name":"Lewis","Email Address":"me@rasheedlewis.com","Street Address Line 1":"2978 Legacy Park Dr","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Lithia Springs","State/Province/Region":"GA","Zip/Postal Code":30122,"Country":"United States"},{"First Name":"Sami","Last Name":"Heard","Email Address":"samimheard@gmail.com","Street Address Line 1":"3201 Jack Cook Dr","Street Address Line 2 (Apartment, Suite, etc.)":"B","City":"Austin","State/Province/Region":"Texas","Zip/Postal Code":78723,"Country":"United States"},{"First Name":"Max","Last Name":"Efremov","Email Address":"maxim.efremov@gmail.com","Street Address Line 1":"4424 Gaines Ranch Loop","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 933","City":"Austin","State/Province/Region":"TX","Zip/Postal Code":78741,"Country":"United States"},{"First Name":"Zeno","Last Name":"Shin","Email Address":"zenodshin@gmail.com","Street Address Line 1":"3955 Western Ave","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Western Springs","State/Province/Region":"Illinois","Zip/Postal Code":60558,"Country":"United States"},{"First Name":"Logan","Last Name":"May","Email Address":"loganmay168@gmail.com","Street Address Line 1":"3509 Durango Root CT","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Fort Worth","State/Province/Region":"Texas","Zip/Postal Code":76244,"Country":"United States"},{"First Name":"Jason ","Last Name":"Jorgenson","Email Address":"jason.j.jorgenson@gmail.com","Street Address Line 1":"12303 Amber Lynn Path","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Manor ","State/Province/Region":"Texas ","Zip/Postal Code":78653,"Country":"United States"},{"First Name":"Michael","Last Name":"Korn","Email Address":"kornacle@gmail.com","Street Address Line 1":"1085 98th Street","Street Address Line 2 (Apartment, Suite, etc.)":"Unit 1","City":"Miami","State/Province/Region":"FL","Zip/Postal Code":33154,"Country":"United States"},{"First Name":"Mike","Last Name":"Tikh","Email Address":"mike.tikh@gmail.com","Street Address Line 1":"39779 woodside dr north","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Northville","State/Province/Region":"Mi","Zip/Postal Code":48168,"Country":"United States"},{"First Name":"YanYan","Last Name":"Wang","Email Address":"yansmailbox@gmail.com","Street Address Line 1":"2916 22nd Street","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"San Francisco","State/Province/Region":"CA","Zip/Postal Code":94110,"Country":"United States"},{"First Name":"Peter","Last Name":"Piontek","Email Address":"piontek0@gmail.com","Street Address Line 1":"10760 Rose Ave","Street Address Line 2 (Apartment, Suite, etc.)":"Apt 203","City":"Los Angeles","State/Province/Region":"California","Zip/Postal Code":90034,"Country":"United States"},{"First Name":"Peter","Last Name":"Sorensen","Email Address":"aydinsorensen@gmail.com","Street Address Line 1":"6137 Oberlander Dr","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Roseville","State/Province/Region":"CA","Zip/Postal Code":95747,"Country":"United States"},{"First Name":"Reena Mary","Last Name":"Puthota","Email Address":"reena.pjfx@gmail.com","Street Address Line 1":"2804 106th St SE","Street Address Line 2 (Apartment, Suite, etc.)":null,"City":"Everett","State/Province/Region":"WA","Zip/Postal Code":98208,"Country":"United States"}];
+
+// De-dupe by email, keep last entry
+const seen = new Map();
+RAW_ALUMNI.forEach(a => seen.set(a['Email Address'].toLowerCase(), a));
+const ALUMNI_BASE = Array.from(seen.values());
+
+// State
+let alumni = [];
+let selectedId = null;
+let trackerFilter = 'all';
+let settings = { formUrl: 'https://forms.gle/gFSZYKyD369Mwx216', senderName: 'Brendan @ Gauntlet AI', replyTo: 'brendan@gauntlethq.com' };
+
+function isFlaggedAddress(a) {
+  const s = a['Street Address Line 1'] || '';
+  return s.toLowerCase().includes('will send') || s.toLowerCase().includes('later') || s === '' || a['City'].toLowerCase().includes('will send');
+}
+
+
+const STATUS_OVERRIDES = {
+  // ✅ CONFIRMED via email — address correct, ship as-is
+  'mbarge0@gmail.com':           { status: 'confirmed', note: '' },
+  'muradaleskerov99@gmail.com':  { status: 'confirmed', note: '' },
+  'ycorcos26@gmail.com':         { status: 'confirmed', note: '' },
+  'greatthenate9@gmail.com':     { status: 'confirmed', note: '' },
+  'marcusday3586@gmail.com':     { status: 'confirmed', note: '' },
+  'tahmeed.rahim@gmail.com':     { status: 'confirmed', note: '' },
+  'yibinlong@outlook.com':       { status: 'confirmed', note: '' },
+  'fuechec.mark@gmail.com':      { status: 'confirmed', note: '' },
+  'samimheard@gmail.com':        { status: 'confirmed', note: '' },
+  'jaram.isaac@gmail.com':       { status: 'confirmed', note: '' },
+  'kornacle@gmail.com':          { status: 'confirmed', note: '' },
+  'gratefulgabe5000@gmail.com':  { status: 'confirmed', note: '' },
+  'maxliss19@gmail.com':         { status: 'confirmed', note: '' },
+  'lousydropout@gmail.com':      { status: 'confirmed', note: '' },
+  'mtornar@gmail.com':           { status: 'confirmed', note: '' },
+  'eric@fullstackeric.com':      { status: 'confirmed', note: '' },
+  'etweinhaus@gmail.com':        { status: 'confirmed', note: '' },
+  'atharva.sardar02@gmail.com':  { status: 'confirmed', note: '' },
+  'ciscodg@gmail.com':           { status: 'confirmed', note: '' },
+  'ankitrijal2054@gmail.com':    { status: 'confirmed', note: '' },
+  'ramishsaqib@yahoo.com':       { status: 'confirmed', note: '' },
+  'hello@adamwhite.work':        { status: 'confirmed', note: '' },
+  'tylerpohn@gmail.com':         { status: 'confirmed', note: '' },
+  'mylesethan93@gmail.com':      { status: 'confirmed', note: '' },
+  'kyuxan@gmail.com':            { status: 'confirmed', note: '' },
+  'maxim.efremov@gmail.com':     { status: 'confirmed', note: '' },
+  'robglnn@gmail.com':           { status: 'confirmed', note: '' },
+  'jskeete@gmail.com':           { status: 'confirmed', note: '' },
+  'john.crimmins@live.com':      { status: 'confirmed', note: '' },
+  'aydinsorensen@gmail.com':     { status: 'confirmed', note: '' },
+  'nrosenfi@gmail.com':          { status: 'confirmed', note: '' },
+  'nickblaskovich@gmail.com':    { status: 'confirmed', note: '' },
+  'ivanovkalin7@gmail.com':      { status: 'confirmed', note: '' },
+  'ryan@zernach.com':            { status: 'confirmed', note: '' },
+
+  // 📝 UPDATED via email reply
+  'sainatha.yatham@gmail.com':   { status: 'updated', note: 'New: 3001 Egan Drive, Pflugerville, TX 78660' },
+  'andrewsheim@gmail.com':       { status: 'updated', note: 'New: 1303 E Cesar Chavez St, Apt E, Austin, TX 78702' },
+
+  // 📝 UPDATED via Google Form
+  'loganmay168@gmail.com':       { status: 'updated', note: 'New: 5213 Westheimer Rd, Keller, TX 76244' },
+  'matt.h.programmer@gmail.com': { status: 'updated', note: 'New: 2001 S Mopac Expy, #2034, Austin, TX 78746' },
+  'zr.davaa@gmail.com':          { status: 'updated', note: 'New: 8421-1418 Broad St, Unit 1418, McLean, VA 22102' },
+  'kashid.k@northeastern.edu':   { status: 'updated', note: 'New: 75 W 18th St, Apt 351, Indianapolis, IN 46202' },
+  'frankyan@usc.edu':            { status: 'updated', note: 'New: 1108 Nueces St, #305, Austin, TX 78701' },
+  's94.david@gmail.com':         { status: 'updated', note: 'New: 168 Belterra Village Way, #14007, Austin, TX 78737' },
+  'me@amaan.com':                { status: 'updated', note: 'New: 700 River St, Apt #3503, Austin, TX 78701' },
+  'tgrahammor@gmail.com':        { status: 'updated', note: 'New: 168 Belterra Village Way, Apt 14007, Austin, TX 78737' },
+  'justicepwhite@gmail.com':     { status: 'updated', note: 'New: 4204 Aldama Dr, Austin, TX 78739' },
+  'nickkenkel@gmail.com':        { status: 'updated', note: 'New: 2410 Bryan St, Austin, TX 78702' },
+  'adamisom@hey.com':            { status: 'updated', note: 'New: 1303 E Cesar Chavez St, Apt E, Austin, TX 78702 (submitted via form with alt email)' },
+  'do.infinitely@gmail.com':     { status: 'updated', note: 'New: 2025 E 7th St, Apt 244, Austin, TX 78702' },
+
+  // 🏢 PICKUP IN PERSON
+  'mike.tikh@gmail.com':         { status: 'flagged', note: 'Pickup in person — also submitted form: 321 W 6th St, #3101, Austin, TX 78701' },
+  'natalyscst@gmail.com':        { status: 'flagged', note: 'Wants to pick up in person — no mailing address submitted' },
+  'jason.j.jorgenson@gmail.com': { status: 'flagged', note: 'Address correct but in office — offered to pick up at HQ' },
+  'reena.pjfx@gmail.com':        { status: 'flagged', note: 'Via Slack — picking up jacket in person tomorrow' },
+};
+
+function initAlumni() {
+  alumni = ALUMNI_BASE.map((a, i) => {
+    const emailKey = a['Email Address'].toLowerCase();
+    const override = STATUS_OVERRIDES[emailKey] || STATUS_OVERRIDES[a['Email Address']] || null;
+    return {
+      id: i,
+      firstName: (a['First Name'] || '').trim(),
+      lastName: (a['Last Name'] || '').trim(),
+      email: a['Email Address'],
+      addr1: (a['Street Address Line 1'] || '').trim(),
+      addr2: a['Street Address Line 2 (Apartment, Suite, etc.)'] ? String(a['Street Address Line 2 (Apartment, Suite, etc.)']).trim() : '',
+      city: (a['City'] || '').trim(),
+      state: (a['State/Province/Region'] || '').trim(),
+      zip: String(a['Zip/Postal Code'] || '').trim(),
+      country: (a['Country'] || '').trim(),
+      status: override ? override.status : (isFlaggedAddress(a) ? 'flagged' : 'pending'),
+      sentAt: override ? Date.now() : null,
+      note: override ? override.note : ''
+    };
+  });
+}
+// settings loaded from defaults above
+
+function saveAlumni() { /* in-memory only — use Export CSV to persist */ }
+function saveSettings() {
+  settings.formUrl = document.getElementById('setting-form-url').value;
+  settings.senderName = document.getElementById('setting-sender-name').value;
+  settings.replyTo = document.getElementById('setting-reply-to').value;
+  updateTemplatePreview();
+  updateFormWarning();
+}
+
+function formatAddress(a) {
+  let lines = [a.addr1];
+  if (a.addr2) lines.push(a.addr2);
+  lines.push(`${a.city}, ${a.state} ${a.zip}`);
+  if (a.country && a.country !== 'United States') lines.push(a.country);
+  return lines.join('\n');
+}
+
+function buildEmailBody(a) {
+  const addr = formatAddress(a);
+  const formLink = settings.formUrl || '[GOOGLE FORM LINK — add in Settings]';
+  const confirmSubject = encodeURIComponent('Address confirmed - ' + a.firstName + ' ' + a.lastName);
+  const confirmBody = encodeURIComponent('Hi Brendan,\n\nMy address on file is correct — please go ahead and ship my jacket!\n\nThanks,\n' + a.firstName + ' ' + a.lastName);
+  const mailtoLink = `mailto:${settings.replyTo}?subject=${confirmSubject}&body=${confirmBody}`;
+  const addrFormatted = addr.split('\n').map(l => `<div style="margin:0;padding:0;">${l}</div>`).join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <!-- Header -->
+        <tr><td style="background:#0d0d0f;padding:24px 32px;">
+          <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.3px;">Gauntlet</span>
+          <span style="color:#666;font-size:14px;margin-left:12px;">Jacket Shipping</span>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 16px;font-size:16px;color:#111;">Hi ${a.firstName},</p>
+          <p style="margin:0 0 24px;font-size:15px;color:#444;line-height:1.6;">Congratulations again on your Gauntlet graduation! 🎉 We're getting ready to ship out your graduation jacket and want to make sure it goes to the right place.</p>
+          <p style="margin:0 0 12px;font-size:13px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.8px;">Address on file</p>
+          <div style="background:#f8f8f8;border-left:3px solid #0d0d0f;border-radius:4px;padding:16px 20px;margin-bottom:32px;font-size:15px;color:#222;line-height:1.8;">${addrFormatted}</div>
+          <!-- Confirm button -->
+          <p style="margin:0 0 12px;font-size:15px;color:#444;line-height:1.6;"><strong>Is this address correct?</strong></p>
+          <table cellpadding="0" cellspacing="0" style="margin-bottom:12px;">
+            <tr><td style="background:#0d0d0f;border-radius:6px;">
+              <a href="${mailtoLink}" style="display:inline-block;padding:14px 28px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;">✅ &nbsp;Yes, ship my jacket to this address</a>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 32px;font-size:13px;color:#888;">Clicking the button will open a pre-written email — just hit Send.</p>
+          <!-- Divider -->
+          <hr style="border:none;border-top:1px solid #eee;margin:0 0 24px;">
+          <!-- Update link -->
+          <p style="margin:0 0 8px;font-size:15px;color:#444;">📝 &nbsp;<strong>Need to update your address?</strong></p>
+          <p style="margin:0 0 4px;font-size:14px;color:#666;line-height:1.6;">Fill out the short form below and we'll use your updated address instead:</p>
+          <p style="margin:0 0 32px;"><a href="${formLink}" style="color:#0066cc;font-size:14px;">${formLink}</a></p>
+          <p style="margin:0 0 4px;font-size:14px;color:#888;">Please respond by <strong style="color:#111;">Thursday, March 26th</strong> so we can get your jacket shipped promptly.</p>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="background:#f8f8f8;padding:20px 32px;border-top:1px solid #eee;">
+          <p style="margin:0;font-size:13px;color:#888;">— ${settings.senderName}, Gauntlet AI &nbsp;·&nbsp; <a href="mailto:${settings.replyTo}" style="color:#888;">${settings.replyTo}</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function buildEmailSubject() {
+  return `[ACTION REQUIRED] Confirm Your Mailing Address — Gauntlet AI Jacket`;
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('alumni-list');
+  list.innerHTML = alumni.map(a => `
+    <div class="alumni-item ${selectedId === a.id ? 'active' : ''}" onclick="selectAlumni(${a.id})">
+      <div class="alumni-status status-${a.status}"></div>
+      <div class="alumni-name">${a.firstName} ${a.lastName}</div>
+    </div>
+  `).join('');
+}
+
+function selectAlumni(id) {
+  selectedId = id;
+  document.getElementById('view-campaign').classList.add('hidden');
+  document.getElementById('view-individual').classList.remove('hidden');
+  renderSidebar();
+  renderIndividual();
+}
+
+function showCampaign() {
+  selectedId = null;
+  document.getElementById('view-individual').classList.add('hidden');
+  document.getElementById('view-campaign').classList.remove('hidden');
+  renderSidebar();
+  updateDashboard();
+}
+
+// ─── INDIVIDUAL VIEW ──────────────────────────────────────────────────────────
+function renderIndividual() {
+  const a = alumni.find(x => x.id === selectedId);
+  if (!a) return;
+  const el = document.getElementById('individual-content');
+  const isFlagged = a.status === 'flagged';
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+      <button class="btn btn-outline" style="padding:6px 12px;font-size:11px" onclick="showCampaign()">← Back</button>
+      <h1>${a.firstName} ${a.lastName}</h1>
+    </div>
+    <div class="subtitle">${a.email}</div>
+
+    ${isFlagged ? `<div class="flagged-notice">⚠ This address looks incomplete or placeholder — this person needs to submit a new address via the Google Form.</div>` : ''}
+
+    <div class="card">
+      <div class="card-label">Address on File</div>
+      <div class="address-block mt-8">${formatAddress(a).replace(/\n/g,'<br>')}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Response Status</div>
+      <div class="status-row mt-8">
+        <button class="status-btn ${a.status==='confirmed'?'active-confirmed':''}" onclick="setStatus(${a.id},'confirmed')">✅ Address Confirmed</button>
+        <button class="status-btn ${a.status==='updated'?'active-updated':''}" onclick="setStatus(${a.id},'updated')">📝 Submitted New Address</button>
+        <button class="status-btn ${a.status==='flagged'?'active-flagged':''}" onclick="setStatus(${a.id},'flagged')">⚠ Flag / No Response</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Email Preview</div>
+      <div class="email-preview mt-8">
+        <div class="email-header">
+          <span class="email-field-label">To</span><span class="email-field-val">${a.email}</span>
+          <span class="email-field-label">Subject</span><span class="email-field-val">${buildEmailSubject()}</span>
+          <span class="email-field-label">From</span><span class="email-field-val">${settings.senderName} &lt;${settings.replyTo}&gt;</span>
+        </div>
+        <div class="email-body">${escapeHtml(buildEmailBody(a))}</div>
+      </div>
+      <div class="btn-row mt-8">
+        <button class="btn btn-primary" onclick="sendSingleEmail(${a.id})" ${a.status!=='pending'&&a.status!=='flagged'?'':''}>${a.status==='sent'?'Resend Email':'Send Email'}</button>
+        <button class="btn btn-outline" onclick="copyEmail(${a.id})">Copy Email Body</button>
+      </div>
+      ${a.sentAt ? `<div class="text-muted mt-8">Last sent: ${new Date(a.sentAt).toLocaleString()}</div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="card-label">Notes</div>
+      <textarea class="input-field mt-8" placeholder="Internal notes about this person…" onchange="setNote(${a.id}, this.value)">${a.note||''}</textarea>
+    </div>
+  `;
+}
+
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+
+function setStatus(id, status) {
+  const a = alumni.find(x => x.id === id);
+  if (a) { a.status = status; saveAlumni(); updateDashboard(); renderSidebar(); renderIndividual(); }
+}
+function setNote(id, val) {
+  const a = alumni.find(x => x.id === id);
+  if (a) { a.note = val; saveAlumni(); }
+}
+function copyEmail(id) {
+  const a = alumni.find(x => x.id === id);
+  navigator.clipboard.writeText(buildEmailBody(a));
+  showToast('✓ Email body copied to clipboard');
+}
+
+// ─── GMAIL SEND ───────────────────────────────────────────────────────────────
+async function sendViaGmail(a) {
+  const subject = buildEmailSubject();
+  const body = buildEmailBody(a);
+  const prompt = `Send an email using Gmail with these exact details:
+To: ${a.email}
+Subject: ${subject}
+Body:
+${body}
+
+Send it now and confirm it was sent.`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      messages: [{ role: "user", content: prompt }],
+      system: "You are sending HTML emails. Always use contentType text/html when creating Gmail drafts or sending.",
+      mcp_servers: [{ type: "url", url: "https://gmail.mcp.claude.com/mcp", name: "gmail-mcp" }]
+    })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message || 'API error');
+  const toolResults = data.content.filter(b => b.type === 'mcp_tool_result');
+  const textBlocks = data.content.filter(b => b.type === 'text');
+  const resultText = [...toolResults.map(b => b.content?.[0]?.text || ''), ...textBlocks.map(b => b.text)].join(' ').toLowerCase();
+  if (resultText.includes('error') && !resultText.includes('sent')) throw new Error('Send may have failed — check Gmail');
+  return true;
+}
+
+async function sendSingleEmail(id) {
+  if (!settings.formUrl) { showToast('⚠ Add your Google Form link in Settings first', 'error'); return; }
+  const a = alumni.find(x => x.id === id);
+  showOverlay(`Sending to ${a.firstName}…`, a.email);
+  try {
+    await sendViaGmail(a);
+    a.status = 'sent'; a.sentAt = Date.now();
+    saveAlumni(); updateDashboard(); renderSidebar(); renderIndividual();
+    showToast(`✓ Email sent to ${a.firstName} ${a.lastName}`);
+  } catch(e) {
+    showToast(`✗ Failed: ${e.message}`, 'error');
+  }
+  hideOverlay();
+}
+
+async function sendAllEmails() {
+  if (!settings.formUrl) { showToast('⚠ Add your Google Form link in Settings first', 'error'); return; }
+  const pending = alumni.filter(a => a.status === 'pending');
+  if (pending.length === 0) { showToast('No pending recipients!'); return; }
+
+  const logEl = document.getElementById('send-log');
+  const logEntries = document.getElementById('send-log-entries');
+  logEl.classList.remove('hidden');
+  logEntries.innerHTML = '';
+
+  let sent = 0, failed = 0;
+  for (let i = 0; i < pending.length; i++) {
+    const a = pending[i];
+    showOverlay(`Sending ${i+1} of ${pending.length}`, `${a.firstName} ${a.lastName} — ${a.email}`);
+    const row = document.createElement('div');
+    row.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;display:flex;gap:12px;align-items:center';
+    row.innerHTML = `<span style="color:var(--muted)">→</span> <span style="flex:1">${a.firstName} ${a.lastName} &lt;${a.email}&gt;</span> <span id="log-${a.id}">⏳ Sending…</span>`;
+    logEntries.appendChild(row);
+    logEntries.scrollTop = logEntries.scrollHeight;
+    try {
+      await sendViaGmail(a);
+      a.status = 'sent'; a.sentAt = Date.now();
+      document.getElementById(`log-${a.id}`).innerHTML = `<span style="color:var(--success)">✓ Sent</span>`;
+      sent++;
+    } catch(e) {
+      document.getElementById(`log-${a.id}`).innerHTML = `<span style="color:var(--danger)">✗ Failed</span>`;
+      failed++;
+    }
+    saveAlumni(); updateDashboard(); renderSidebar();
+    await new Promise(r => setTimeout(r, 500));
+  }
+  hideOverlay();
+  showToast(`Done: ${sent} sent, ${failed} failed`);
+}
+
+function previewFirst() {
+  const first = alumni.find(a => a.status === 'pending');
+  if (first) selectAlumni(first.id);
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function updateDashboard() {
+  const counts = { pending: 0, sent: 0, confirmed: 0, updated: 0, flagged: 0 };
+  alumni.forEach(a => { counts[a.status] = (counts[a.status]||0) + 1; });
+  document.getElementById('count-pending').textContent = counts.pending || 0;
+  document.getElementById('count-sent').textContent = counts.sent || 0;
+  document.getElementById('count-confirmed').textContent = counts.confirmed || 0;
+  document.getElementById('count-updated').textContent = counts.updated || 0;
+  document.getElementById('d-pending').textContent = counts.pending || 0;
+  document.getElementById('d-sent').textContent = counts.sent || 0;
+  document.getElementById('d-confirmed').textContent = counts.confirmed || 0;
+  document.getElementById('d-updated').textContent = counts.updated || 0;
+  const actioned = (counts.confirmed||0) + (counts.updated||0);
+  const pct = Math.round(actioned / alumni.length * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = `${actioned} / ${alumni.length} responded`;
+  document.getElementById('btn-send-all').textContent = `Send to All Pending (${counts.pending||0})`;
+
+  // Flagged list
+  const flagged = alumni.filter(a => a.status === 'flagged');
+  const fEl = document.getElementById('flagged-list');
+  if (flagged.length === 0) {
+    fEl.innerHTML = '<div class="text-muted">No flagged addresses 🎉</div>';
+  } else {
+    fEl.innerHTML = flagged.map(a => `
+      <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" onclick="selectAlumni(${a.id})">
+        <span style="color:var(--danger)">⚠</span>
+        <span style="flex:1"><b>${a.firstName} ${a.lastName}</b> — ${a.email}</span>
+        <span style="color:var(--muted)">${a.addr1 ? a.addr1.substring(0,30)+'…' : 'No address'}</span>
+      </div>`).join('');
+  }
+}
+
+// ─── TRACKER ──────────────────────────────────────────────────────────────────
+function renderTracker() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const filtered = alumni.filter(a => {
+    const matchFilter = trackerFilter === 'all' || a.status === trackerFilter;
+    const matchSearch = !q || `${a.firstName} ${a.lastName} ${a.email}`.toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+  const tbody = document.getElementById('tracker-body');
+  tbody.innerHTML = filtered.map(a => `
+    <tr>
+      <td><b>${a.firstName} ${a.lastName}</b></td>
+      <td style="color:var(--muted)">${a.email}</td>
+      <td style="color:var(--muted);font-size:11px">${a.addr1}${a.addr2?' '+a.addr2:''}, ${a.city} ${a.state}</td>
+      <td><span class="badge badge-${a.status}">${{pending:'Pending',sent:'Sent',confirmed:'✓ Confirmed',updated:'↺ Updated',flagged:'⚠ Flagged'}[a.status]}</span></td>
+      <td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="selectAlumni(${a.id})">View</button></td>
+    </tr>`).join('');
+}
+
+function setFilter(f, btn) {
+  trackerFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTracker();
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function exportCSV() {
+  const header = ['First Name','Last Name','Email','Address','City','State','Zip','Status','Sent At','Note'];
+  const rows = alumni.map(a => [
+    a.firstName, a.lastName, a.email,
+    `"${a.addr1}${a.addr2?' '+a.addr2:''}"`,
+    a.city, a.state, a.zip, a.status,
+    a.sentAt ? new Date(a.sentAt).toLocaleString() : '',
+    `"${a.note||''}"`
+  ]);
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = 'gauntlet_jacket_tracker.csv'; link.click();
+  showToast('✓ CSV exported');
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['overview','send-all','tracker','settings'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('hidden', t !== tab);
+  });
+  document.querySelectorAll('.tab').forEach((el, i) => {
+    el.classList.toggle('active', ['overview','send-all','tracker','settings'][i] === tab);
+  });
+  if (tab === 'tracker') renderTracker();
+  if (tab === 'settings') {
+    document.getElementById('setting-form-url').value = settings.formUrl;
+    document.getElementById('setting-sender-name').value = settings.senderName;
+    document.getElementById('setting-reply-to').value = settings.replyTo;
+    updateTemplatePreview();
+  }
+  updateFormWarning();
+}
+
+function updateFormWarning() {
+  const warn = document.getElementById('form-link-warning');
+  if (warn) warn.classList.toggle('hidden', !!settings.formUrl);
+}
+
+function updateTemplatePreview() {
+  const sample = alumni[0];
+  if (!sample) return;
+  document.getElementById('tmpl-subject-preview').textContent = buildEmailSubject();
+  document.getElementById('tmpl-from-preview').textContent = `${settings.senderName} <${settings.replyTo}>`;
+  document.getElementById('tmpl-body-preview').innerHTML = escapeHtml(buildEmailBody(sample));
+}
+
+// ─── OVERLAY / TOAST ──────────────────────────────────────────────────────────
+function showOverlay(msg, sub) {
+  document.getElementById('sending-msg').textContent = msg;
+  document.getElementById('sending-sub').textContent = sub || '';
+  document.getElementById('sending-overlay').classList.add('active');
+}
+function hideOverlay() { document.getElementById('sending-overlay').classList.remove('active'); }
+
+let toastTimer;
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show toast-' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+initAlumni();
+renderSidebar();
+updateDashboard();
+showCampaign();
+</script>
+</body>
+</html>
